@@ -14,5 +14,6 @@
     "short_description": "Get company data such as names, industry, follower counts, employee numbers, and more.",
     "version": "1.0.0",
     "documentation_file": "./documentation.md",
-    "input_file": "./input.json"
+    "input_file": "./input.json",
+    "app_id": "3a3b26cc-ee8b-46d5-af66-178711af8b27"
 }
