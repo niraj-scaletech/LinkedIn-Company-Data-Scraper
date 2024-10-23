@@ -1,3 +1,5 @@
-import GetGoogleLinks from "./index";
+import GetLinkedInCompanyData from "./index";
 
-GetGoogleLinks({ searches: `crawlora\nscaletech` });
+GetLinkedInCompanyData({
+    searches: `https://www.linkedin.com/company/scaletech-xyz/\nhttps://www.linkedin.com/company/microsoft/`,
+});

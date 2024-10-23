@@ -1,59 +1,116 @@
+import debug from "debug";
 import { apikey, sequence_id, showBrowser } from "./config";
-
 import { browser } from "@crawlora/browser";
+import { Page } from "puppeteer-extra-plugin/dist/puppeteer";
 
 export default async function ({
-  searches, // data coming from textarea which means it is multiline
+  searches,
 }: {
   searches: string;
 }) {
-
   const formedData = searches.trim().split("\n").map(v => v.trim())
 
- await browser(async ({page, wait, output, debug }) => {
+  for await (const companyUrl of formedData) {
+    await browser(async ({ page, wait, output, debug }) => {
+      try {
+        debug(`Navigating to: ${companyUrl}`);
+        await navigateWithRetry(companyUrl, page, wait, debug);
 
-    for await (const searchs of formedData) {
+        await wait(2);
+        debug(`Scraping data for: ${companyUrl}`);
 
-      await page.goto("https://google.com");
+        const companyDetails = await getCompanyDetails(page, wait);
+        console.log("🚀 ~ awaitbrowser ~ companyDetails:", companyDetails);
 
-      debug(`visiting google website`)
-  
-      await wait(2);
-  
-      await page.type('textarea[name="q"]', searchs);
+        debug(`Start submit data for: ${companyUrl}`);
 
-      debug(`looking for textarea to type`)
+        await wait(2)
 
-  
-      await page.keyboard.press("Enter");
+        await output.create({
+          sequence_id,
+          sequence_output: {
+            Name: companyDetails.name,
+            Industry: companyDetails.industry,
+            TagLine: companyDetails.tagLine,
+            Followers: companyDetails.followers,
+            EmployeeCount: companyDetails.employeeCount,
+            Description: companyDetails.description,
+            Website: companyDetails.website,
+            CompanySize: companyDetails.companySize,
+            Headquarters: companyDetails.headquarters,
+            OrganizationType: companyDetails.organizationType,
+            Founded: companyDetails.founded,
+            Specialties: companyDetails.specialties,
+            Locations: companyDetails.locations,
+          },
+        });
 
-      debug(`pressing enter`)
+        debug(`Data submitted successfully for: ${companyUrl}`);
 
-  
-      await page.waitForNavigation({ waitUntil: ["networkidle2"] });
-
-      debug(`waiting for page navigation`)
-
-  
-      const links = await page.$$eval("a", (anchors) =>
-        anchors.map((anchor) => anchor.href)
-      );
-
-      debug(`fetching links`)
-
-
-      await wait(2);
-
-      debug(`started submitting links`)
-
-      await Promise.all(links.map(async (link) => {
-        await output.create({sequence_id, sequence_output: { [searchs]: link }}) // save data per line
-      }))
-      
-      debug(`submitted links`)
-
-    }
-
-  }, { showBrowser, apikey })
+      } catch (error) {
+        const e = error as Error
+        debug(error)
+        throw new Error(e.message);
+      }
+    }, { showBrowser, apikey })
+  }
 
 }
+
+async function navigateWithRetry(url: string, page: Page, wait: any, debug: debug.Debugger) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+      return true;
+    } catch (error) {
+      const e = error as Error;
+      debug(`Attempt ${attempt} failed for ${url}:`, e.message);
+      if (attempt === 3) {
+        throw new Error(`Failed to navigate to ${url} after ${3} attempts`);
+      }
+      await wait(2);
+    }
+  }
+}
+
+async function getCompanyDetails(page: any, wait: any) {
+  return await page.evaluate(() => {
+    const getText = (selector: string) =>
+      document.querySelector(selector)?.textContent?.trim() ?? 'N/A';
+
+    const followersText = getText('h3.top-card-layout__first-subline').match(/(\d[\d,]*) followers/);
+    const employeeCountMatch = getText('p.face-pile__text').match(/(\d[\d,]*) employees/);
+
+    const locations: Record<string, boolean | string>[] = [];
+    document.querySelectorAll('ul.show-more-less__list li.mb-3').forEach((item) => {
+      const isPrimary = item.querySelector('.tag-sm')?.textContent?.includes('Primary') || false;
+      const addressLines = Array.from(item.querySelectorAll('p')).map((p) => p?.textContent?.trim());
+      const address = addressLines.join(', ');
+      locations.push({ address, isPrimary });
+    });
+
+    const locationsString = locations
+      .map(loc => `${loc.address}${loc.isPrimary ? ' (Primary)' : ''}`)
+      .join('; ');
+
+
+    return {
+      name: getText('h1'),
+      industry: getText('[data-test-id="about-us__industry"] dd'),
+      tagLine: getText('.top-card-layout__second-subline span'),
+      followers: followersText ? parseInt(followersText[1].replace(/,/g, '')) : 0,
+      employeeCount: employeeCountMatch ? parseInt(employeeCountMatch[1].replace(/,/g, '')) : 0,
+      description: getText('p[data-test-id="about-us__description"]').replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim(),
+      website: getText('[data-test-id="about-us__website"] a') || 'N/A',
+      companySize: getText('[data-test-id="about-us__size"] dd'),
+      headquarters: getText('[data-test-id="about-us__headquarters"] dd'),
+      organizationType: getText(
+        '[data-test-id="about-us__organizationType"] dd'
+      ),
+      founded: getText('[data-test-id="about-us__foundedOn"] dd'),
+      specialties: getText('[data-test-id="about-us__specialties"] dd'),
+      locations: locationsString,
+    };
+  });
+}
+

@@ -2,9 +2,9 @@
     {
         "type": "textarea",
         "datatype": "string",
-        "placeholder": "Enter search keywords per line",
-        "default": "crawlora",
-        "label": "Google searchs",
+        "placeholder": "Enter Urls per line",
+        "default": "https://www.linkedin.com/company/scaletech-xyz/",
+        "label": "LinkedIn company Urls",
         "regex": "/^.*$/",
         "required": true,
         "name": "searches"
