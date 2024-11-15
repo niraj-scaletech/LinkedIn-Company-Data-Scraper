@@ -1,6 +1,6 @@
 import debug from "debug";
-import { apikey, sequence_id, showBrowser } from "./config";
-import { browser } from "@crawlora/browser";
+import { sequence_id } from "./config";
+import { windows } from "@crawlora/browser";
 import { Page } from "puppeteer-extra-plugin/dist/puppeteer";
 
 export default async function ({
@@ -10,50 +10,47 @@ export default async function ({
 }) {
   const formedData = searches.trim().split("\n").map(v => v.trim())
 
-  for await (const companyUrl of formedData) {
-    await browser(async ({ page, wait, output, debug }) => {
-      try {
-        debug(`Navigating to: ${companyUrl}`);
-        await navigateWithRetry(companyUrl, page, wait, debug);
+  await windows(formedData, async (companyUrl, { page, wait, output, debug }) => {
+    try {
+      debug(`Navigating to: ${companyUrl}`);
+      await navigateWithRetry(companyUrl, page, wait, debug);
 
-        await wait(2);
-        debug(`Scraping data for: ${companyUrl}`);
+      await wait(2);
+      debug(`Scraping data for: ${companyUrl}`);
 
-        const companyDetails = await getCompanyDetails(page, wait);
-        console.log("🚀 ~ awaitbrowser ~ companyDetails:", companyDetails);
+      const companyDetails = await getCompanyDetails(page, wait);
 
-        debug(`Start submit data for: ${companyUrl}`);
+      debug(`Start submit data for: ${companyUrl}`);
 
-        await wait(2)
+      await wait(2)
 
-        await output.create({
-          sequence_id,
-          sequence_output: {
-            Name: companyDetails.name,
-            Industry: companyDetails.industry,
-            TagLine: companyDetails.tagLine,
-            Followers: companyDetails.followers,
-            EmployeeCount: companyDetails.employeeCount,
-            Description: companyDetails.description,
-            Website: companyDetails.website,
-            CompanySize: companyDetails.companySize,
-            Headquarters: companyDetails.headquarters,
-            OrganizationType: companyDetails.organizationType,
-            Founded: companyDetails.founded,
-            Specialties: companyDetails.specialties,
-            Locations: companyDetails.locations,
-          },
-        });
+      await output.create({
+        sequence_id,
+        sequence_output: {
+          Name: companyDetails.name,
+          Industry: companyDetails.industry,
+          TagLine: companyDetails.tagLine,
+          Followers: companyDetails.followers,
+          EmployeeCount: companyDetails.employeeCount,
+          Description: companyDetails.description,
+          Website: companyDetails.website,
+          CompanySize: companyDetails.companySize,
+          Headquarters: companyDetails.headquarters,
+          OrganizationType: companyDetails.organizationType,
+          Founded: companyDetails.founded,
+          Specialties: companyDetails.specialties,
+          Locations: companyDetails.locations,
+        },
+      });
 
-        debug(`Data submitted successfully for: ${companyUrl}`);
+      debug(`Data submitted successfully for: ${companyUrl}`);
 
-      } catch (error) {
-        const e = error as Error
-        debug(error)
-        throw new Error(e.message);
-      }
-    }, { showBrowser, apikey })
-  }
+    } catch (error) {
+      const e = error as Error
+      debug(error)
+      throw new Error(e.message);
+    }
+  })
 
 }
 
